@@ -28,9 +28,22 @@ const PRECACHE = [
 
 /** Files Flutter needs before the first frame (may not exist on every build). */
 const RUNTIME_PRECACHE = [
-  'assets/AssetManifest.json',
-  'assets/AssetManifest.bin',
+  'assets/AssetManifest.bin.json',
   'assets/FontManifest.json',
+  'assets/fonts/MaterialIcons-Regular.otf',
+];
+
+/** Image files the app always needs offline, used when the manifest is absent. */
+const FALLBACK_ASSETS = [
+  'assets/assets/images/avatar.png',
+  'assets/assets/images/banaue.jpg',
+  'assets/assets/images/boracay.jpg',
+  'assets/assets/images/chocolate_hills.jpg',
+  'assets/assets/images/el_nido.jpg',
+  'assets/assets/images/hundred_islands.jpg',
+  'assets/assets/images/intramuros.jpg',
+  'assets/assets/images/logo.png',
+  'assets/assets/images/mayon.jpg',
 ];
 
 async function putIfOk(cache, request, response) {
@@ -52,23 +65,38 @@ async function precache(cache, urls) {
   );
 }
 
-/** Every image/font declared in the Flutter asset manifest. */
+/** Every image/font declared in the Flutter asset manifests. */
 async function collectBundledAssets() {
   try {
-    const response = await fetch('assets/AssetManifest.json');
+    const response = await fetch('assets/AssetManifest.bin.json');
+    if (!response.ok) return FALLBACK_ASSETS;
+    const base64 = await response.json();
+    const binary = typeof base64 === 'string' ? atob(base64) : '';
+    // Flutter serves every asset under the "assets/" directory, so the
+    // declared keys ("assets/...", "packages/...") need that prefix.
+    const keys = binary.match(/(assets|packages)\/[A-Za-z0-9_\-./]+/g) || [];
+    const urls = Array.from(new Set(keys)).map((key) => 'assets/' + key);
+    return urls.length > 0 ? urls : FALLBACK_ASSETS;
+  } catch (error) {
+    console.warn('Could not read the asset manifest:', error);
+    return FALLBACK_ASSETS;
+  }
+}
+
+/** Font files declared in FontManifest.json, served under "assets/". */
+async function collectFonts() {
+  try {
+    const response = await fetch('assets/FontManifest.json');
     if (!response.ok) return [];
-    const manifest = await response.json();
+    const families = await response.json();
     const urls = [];
-    for (const value of Object.values(manifest)) {
-      if (typeof value === 'string') {
-        urls.push(value);
-      } else if (Array.isArray(value)) {
-        urls.push(...value);
+    for (const family of families) {
+      for (const font of family.fonts || []) {
+        if (typeof font.asset === 'string') urls.push('assets/' + font.asset);
       }
     }
     return urls;
   } catch (error) {
-    console.warn('Could not read the asset manifest:', error);
     return [];
   }
 }
@@ -80,6 +108,7 @@ self.addEventListener('install', (event) => {
       await precache(cache, PRECACHE);
       await precache(cache, RUNTIME_PRECACHE);
       await precache(cache, await collectBundledAssets());
+      await precache(cache, await collectFonts());
       await self.skipWaiting();
     })(),
   );
