@@ -317,6 +317,30 @@ void main() {
 
       expect(find.text('Ana Dela Cruz'), findsOneWidget);
     });
+    testWidgets('Settings screen opens and shows the Live Website', (
+      WidgetTester tester,
+    ) async {
+      useTallPhone(tester);
+      await tester.pumpWidget(const TravelDestinationGuideApp());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Live Website'), findsWidgets);
+      expect(
+        find.textContaining('ryzamora.github.io/travel-destination-guide'),
+        findsOneWidget,
+      );
+      // The PWA sections only exist in the browser build.
+      expect(find.text('Offline availability'), findsNothing);
+      expect(find.text('Install App'), findsNothing);
+
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Top Destinations'), findsOneWidget);
+    });
   });
 
   test('route names are all different', () {
@@ -327,7 +351,8 @@ void main() {
       AppRoutes.addDestination,
       AppRoutes.tripPlan,
       AppRoutes.profile,
+      AppRoutes.settings,
     };
-    expect(routes.length, 6);
+    expect(routes.length, 7);
   });
 }
